@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORION — Orbital Decision Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #07080f;
+  --void:   #09090e;
+  --surf:   #0e0f1a;
+  --panel:  #111218;
+  --border: rgba(255,255,255,0.07);
+  --bhi:    rgba(255,255,255,0.13);
+  --gold:   #c8a96e;
+  --glo:    rgba(200,169,110,0.12);
+  --gmid:   rgba(200,169,110,0.28);
+  --blue:   #5b8fff;
+  --blo:    rgba(91,143,255,0.13);
+  --red:    #ff5252;
+  --rlo:    rgba(255,82,82,0.13);
+  --green:  #3dd68c;
+  --grnlo:  rgba(61,214,140,0.11);
+  --warn:   #ffb547;
+  --wlo:    rgba(255,181,71,0.12);
+  --plat:   #e8e8f2;
+  --silver: #8a8aaa;
+  --dim:    #42425a;
+  --mono:   'DM Mono', monospace;
+  --sans:   'DM Sans', sans-serif;
+  --disp:   'Syne', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--plat); font-family: var(--sans); font-size: 12px; }
+
+/* ═══════════════════════════════════════════
+   SHELL — 3 rows, 3 cols (no icon rail squish)
+   topbar spans full width
+   left | globe | right fill the middle row
+   statusbar spans full width
+═══════════════════════════════════════════ */
+.shell {
+  display: grid;
+  height: 100vh;
+  grid-template-rows: 48px 1fr 24px;
+  grid-template-columns: 260px 1fr 280px;
+  grid-template-areas:
+    "top  top   top"
+    "left globe right"
+    "bar  bar   bar";
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-area: top;
+  background: var(--void);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 16px;
+  z-index: 50;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; }
+.brand-name { font-family: var(--disp); font-weight: 800; font-size: 15px; letter-spacing: .16em; color: var(--gold); }
+.brand-sub  { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+
+.search-wrap { flex: 1; max-width: 480px; position: relative; min-width: 0; }
+.search-inp {
+  width: 100%; background: var(--panel); border: 1px solid var(--bhi);
+  border-radius: 4px; padding: 7px 40px 7px 14px; color: var(--plat);
+  font-family: var(--sans); font-size: 12px; outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.search-inp::placeholder { color: var(--dim); }
+.search-inp:focus { border-color: rgba(200,169,110,.5); box-shadow: 0 0 0 3px rgba(200,169,110,.07); }
+.search-btn {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  background: var(--gold); border: none; border-radius: 3px;
+  width: 28px; height: 24px; cursor: pointer; color: #07080f;
+  font-family: var(--mono); font-weight: 700; font-size: 13px;
+  transition: background .15s;
+}
+.search-btn:hover { background: #d4b97e; }
+.search-hint { position: absolute; right: 42px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 9px; color: var(--dim); }
+.sug-box {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--panel); border: 1px solid var(--bhi); border-radius: 4px;
+  z-index: 300; display: none; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.7);
+}
+.sug-box.open { display: block; }
+.sug-item { padding: 9px 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); transition: background .1s; font-size: 11px; }
+.sug-item:last-child { border-bottom: none; }
+.sug-item:hover { background: rgba(255,255,255,.04); }
+.sug-name { flex: 1; color: var(--plat); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sug-region { font-family: var(--mono); font-size: 9px; color: var(--dim); flex-shrink: 0; }
+.sug-count  { font-family: var(--mono); font-size: 9px; color: var(--gold); flex-shrink: 0; }
+.sug-empty  { padding: 11px 14px; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+.top-right { margin-left: auto; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.live-pill { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 9px; letter-spacing: .13em; color: var(--green); background: var(--grnlo); padding: 4px 10px; border-radius: 20px; }
+.live-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 7px var(--green); } 50% { box-shadow: none; opacity: .5; } }
+.utc { font-family: var(--mono); font-size: 10px; color: var(--silver); letter-spacing: .06em; }
+
+/* ── LEFT PANEL ── */
+.left {
+  grid-area: left;
+  background: var(--void);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Morning brief */
+.brief { padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.brief-eyebrow { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+.brief-greeting { font-family: var(--disp); font-size: 12px; font-weight: 600; color: var(--plat); margin-bottom: 6px; }
+.brief-line { display: flex; align-items: flex-start; gap: 6px; font-size: 10px; line-height: 1.45; color: var(--silver); margin-bottom: 3px; }
+.bi { flex-shrink: 0; font-size: 11px; }
+.c-red  { color: var(--red); }
+.c-warn { color: var(--warn); }
+.c-grn  { color: var(--green); }
+.c-gold { color: var(--gold); }
+
+/* Health row */
+.health-row { display: flex; gap: 5px; padding: 8px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.hcard { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 6px 8px; text-align: center; }
+.hval { font-family: var(--disp); font-weight: 700; font-size: 16px; line-height: 1; }
+.hlbl { font-family: var(--mono); font-size: 7px; color: var(--dim); margin-top: 2px; letter-spacing: .08em; }
+
+/* Section header */
+.sec-head { padding: 10px 14px 7px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.sec-title { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+.sec-badge { font-family: var(--mono); font-size: 8px; padding: 2px 7px; border-radius: 10px; background: rgba(255,255,255,.04); color: var(--silver); }
+
+/* Conjunction cards */
+.conj-list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.conj-list::-webkit-scrollbar { width: 2px; }
+.conj-list::-webkit-scrollbar-thumb { background: var(--bhi); }
+
+.ccard {
+  background: var(--panel); border: 1px solid var(--border);
+  border-left: 3px solid transparent; border-radius: 3px;
+  padding: 9px 11px; cursor: pointer; transition: all .15s;
+}
+.ccard.critical { border-left-color: var(--red); }
+.ccard.warning  { border-left-color: var(--warn); }
+.ccard.nominal  { border-left-color: var(--green); }
+.ccard:hover    { background: rgba(255,255,255,.025); border-color: var(--bhi); }
+.ccard.active   { background: var(--glo); border-left-color: var(--gold) !important; border-color: var(--gmid); }
+
+.cc-top  { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.cc-names { min-width: 0; flex: 1; }
+.cc-pri  { font-size: 11px; color: var(--plat); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-sec  { font-size: 10px; color: var(--silver); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-prob { font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 2px; flex-shrink: 0; white-space: nowrap; }
+.critical .cc-prob { background: var(--rlo); color: var(--red); }
+.warning  .cc-prob { background: var(--wlo); color: var(--warn); }
+.nominal  .cc-prob { background: var(--grnlo); color: var(--green); }
+
+.cc-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin-bottom: 5px; }
+.cc-row  { font-family: var(--mono); font-size: 8px; color: var(--dim); }
+.cc-row span { color: var(--silver); }
+.cc-action { padding: 5px 8px; border-radius: 2px; font-family: var(--mono); font-size: 9px; line-height: 1.4; }
+.cc-provenance { padding: 3px 8px 5px; font-family: var(--mono); font-size: 8px; color: var(--bhi); opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 3px; }
+.critical .cc-action { background: var(--rlo); color: var(--red); }
+.warning  .cc-action { background: var(--wlo); color: var(--warn); }
+.nominal  .cc-action { background: var(--grnlo); color: var(--green); }
+
+/* ── GLOBE ── */
+.globe-wrap {
+  grid-area: globe;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  cursor: grab;
+}
+.globe-wrap:active { cursor: grabbing; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.xh, .xv { position: absolute; pointer-events: none; opacity: 0; transition: opacity .2s; background: rgba(255,255,255,.025); }
+.xh { height: 1px; left: 0; right: 0; }
+.xv { width: 1px; top: 0; bottom: 0; }
+.globe-wrap:hover .xh, .globe-wrap:hover .xv { opacity: 1; }
+
+.corner { position: absolute; font-family: var(--mono); font-size: 8px; color: var(--dim); letter-spacing: .1em; pointer-events: none; line-height: 1.8; }
+.corner.tl { top: 12px; left: 12px; }
+.corner.tr { top: 12px; right: 12px; text-align: right; }
+.corner.bl { bottom: 12px; left: 12px; }
+.corner.br { bottom: 12px; right: 12px; text-align: right; }
+
+.zbtn-wrap { position: absolute; bottom: 36px; right: 12px; display: flex; flex-direction: column; gap: 2px; }
+.zbtn { width: 26px; height: 26px; background: var(--panel); border: 1px solid var(--bhi); color: var(--silver); font-size: 16px; cursor: pointer; border-radius: 2px; font-family: var(--mono); display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.zbtn:hover { background: var(--glo); color: var(--gold); border-color: var(--gmid); }
+
+/* Satellite tooltip */
+.sat-tip { position: absolute; background: rgba(7,8,15,.97); border: 1px solid var(--bhi); backdrop-filter: blur(14px); padding: 11px 14px; border-radius: 3px; pointer-events: none; display: none; z-index: 40; min-width: 190px; }
+.sat-tip.show { display: block; }
+.st-name { font-family: var(--disp); font-weight: 600; font-size: 12px; color: var(--plat); margin-bottom: 7px; }
+.st-row { display: flex; justify-content: space-between; gap: 12px; font-family: var(--mono); font-size: 9px; margin-bottom: 3px; }
+.st-l { color: var(--dim); }
+.st-v { color: var(--plat); }
+.st-act { margin-top: 8px; padding: 6px 8px; border-radius: 2px; font-family: var(--mono); font-size: 9px; line-height: 1.4; display: none; }
+
+/* Location overlay */
+.loc-box {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(7,8,15,.94); border: 1px solid rgba(200,169,110,.22);
+  backdrop-filter: blur(14px); padding: 12px 16px; border-radius: 3px;
+  width: calc(100% - 40px); max-width: 420px; display: none; z-index: 35;
+}
+.loc-box.show { display: block; }
+.loc-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+.loc-name { font-family: var(--disp); font-weight: 600; font-size: 13px; color: var(--gold); }
+.loc-close { font-family: var(--mono); font-size: 10px; color: var(--dim); cursor: pointer; }
+.loc-coord { font-family: var(--mono); font-size: 9px; color: var(--dim); margin-bottom: 10px; }
+.loc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.loc-cell { background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 7px 9px; }
+.loc-val { font-family: var(--disp); font-weight: 600; font-size: 15px; line-height: 1; }
+.loc-lbl { font-family: var(--mono); font-size: 7px; color: var(--dim); margin-top: 3px; letter-spacing: .1em; text-transform: uppercase; }
+
+/* 72h timeline overlay */
+.tl-box {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(7,8,15,.94); border: 1px solid var(--bhi);
+  backdrop-filter: blur(14px); padding: 14px 16px; border-radius: 3px;
+  width: calc(100% - 40px); max-width: 660px; display: none; z-index: 35;
+}
+.tl-box.show { display: block; }
+.tl-head { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); margin-bottom: 10px; display: flex; justify-content: space-between; }
+.tl-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 700px) { .tl-grid { grid-template-columns: repeat(2, 1fr); } }
+.tl-day { background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 8px 10px; }
+.tl-day-lbl { font-family: var(--mono); font-size: 8px; color: var(--dim); letter-spacing: .1em; margin-bottom: 6px; text-transform: uppercase; }
+.tl-ev { display: flex; align-items: flex-start; gap: 5px; font-size: 10px; color: var(--silver); margin-bottom: 3px; line-height: 1.4; }
+.tl-dot { flex-shrink: 0; margin-top: 3px; width: 5px; height: 5px; border-radius: 50%; }
+
+/* ── RIGHT PANEL ── */
+.right {
+  grid-area: right;
+  background: var(--void);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.right-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.right-scroll::-webkit-scrollbar { width: 2px; }
+.right-scroll::-webkit-scrollbar-thumb { background: var(--bhi); }
+
+/* AI assistant */
+.ai-sec { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.ai-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
+.ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 8px var(--blue); animation: pulse 2s ease-in-out infinite; }
+.ai-bub { background: var(--blo); border: 1px solid rgba(91,143,255,.15); border-radius: 3px; padding: 9px 11px; font-size: 11px; color: var(--silver); line-height: 1.6; margin-bottom: 8px; min-height: 60px; }
+.ai-bub strong { color: var(--plat); }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.ai-chip { background: var(--panel); border: 1px solid var(--bhi); border-radius: 20px; padding: 3px 9px; font-family: var(--mono); font-size: 8px; color: var(--silver); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.ai-chip:hover { background: var(--blo); color: var(--blue); border-color: rgba(91,143,255,.3); }
+.ai-row { display: flex; gap: 5px; }
+.ai-inp { flex: 1; background: var(--panel); border: 1px solid var(--bhi); border-radius: 3px; padding: 6px 10px; color: var(--plat); font-family: var(--sans); font-size: 11px; outline: none; min-width: 0; }
+.ai-inp:focus { border-color: rgba(91,143,255,.4); }
+.ai-send { background: var(--blue); border: none; border-radius: 3px; padding: 6px 10px; color: #07080f; font-family: var(--mono); font-size: 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.ai-send:hover { background: #7aaeff; }
+
+/* Gauge */
+.gauge-sec { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.g-head { font-family: var(--mono); font-size: 8px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin-bottom: 7px; display: flex; justify-content: space-between; align-items: center; }
+.g-track { height: 3px; background: rgba(255,255,255,.04); border-radius: 2px; position: relative; margin-bottom: 4px; }
+.g-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--green) 0%, var(--warn) 55%, var(--red) 100%); transition: width 1s cubic-bezier(.4,0,.2,1); position: relative; }
+.g-fill::after { content: ''; position: absolute; right: -1px; top: -4px; width: 2px; height: 11px; background: white; border-radius: 1px; box-shadow: 0 0 6px white; }
+.g-scale { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 7px; color: var(--dim); }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 2px; padding: 8px 10px; }
+.stat-l { font-family: var(--mono); font-size: 7px; letter-spacing: .13em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+.stat-v { font-family: var(--disp); font-weight: 600; font-size: 17px; color: var(--plat); line-height: 1; }
+.stat-v.gold { color: var(--gold); }
+.stat-v.red  { color: var(--red); }
+.stat-d { font-family: var(--mono); font-size: 8px; color: var(--dim); margin-top: 2px; }
+.stat-d.up { color: var(--red); }
+
+/* Space weather */
+.sw-sec { padding: 10px 14px; border-top: 1px solid var(--border); }
+.sw-head { font-family: var(--mono); font-size: 8px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+.sw-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 10px; }
+.sw-row:last-child { border-bottom: none; }
+.sw-name { flex: 1; color: var(--silver); font-size: 10px; }
+.sw-bar-wrap { width: 64px; height: 3px; background: rgba(255,255,255,.05); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.sw-bar { height: 100%; border-radius: 2px; }
+.sw-val { font-family: var(--mono); font-size: 9px; width: 30px; text-align: right; flex-shrink: 0; }
+
+/* Replay */
+.replay { margin: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; cursor: pointer; transition: all .15s; }
+.replay:hover { border-color: var(--gmid); background: var(--glo); }
+.replay-icon { font-size: 15px; flex-shrink: 0; }
+.replay-text { flex: 1; min-width: 0; }
+.replay-title { font-size: 11px; color: var(--plat); font-weight: 500; margin-bottom: 1px; }
+.replay-sub   { font-size: 10px; color: var(--silver); line-height: 1.4; }
+.replay-arr   { color: var(--dim); font-size: 12px; flex-shrink: 0; }
+
+/* TCA */
+.tca-sec { border-top: 1px solid var(--border); }
+.tca-row { display: flex; align-items: center; padding: 6px 14px; gap: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+.tca-row:hover { background: rgba(255,255,255,.02); }
+.tca-t { font-family: var(--mono); font-size: 9px; color: var(--silver); width: 54px; flex-shrink: 0; }
+.tca-o { flex: 1; font-family: var(--mono); font-size: 9px; color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tca-o span { color: var(--silver); }
+.tca-m { font-family: var(--mono); font-size: 9px; width: 46px; text-align: right; flex-shrink: 0; }
+
+/* ── STATUSBAR ── */
+.statusbar {
+  grid-area: bar;
+  background: var(--void);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 16px;
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: .1em;
+  overflow: hidden;
+}
+.sb-i { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.sb-d { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.sb-d.g { background: var(--green); }
+.sb-d.y { background: var(--warn); }
+.sb-r { margin-left: auto; white-space: nowrap; }
+
+/* timeline btn */
+.tl-btn {
+  position: absolute; top: 12px; left: 12px; z-index: 20;
+  background: var(--panel); border: 1px solid var(--bhi); color: var(--silver);
+  font-family: var(--mono); font-size: 8px; letter-spacing: .1em;
+  padding: 5px 10px; border-radius: 2px; cursor: pointer; transition: all .15s;
+  text-transform: uppercase;
+}
+.tl-btn:hover { background: var(--glo); color: var(--gold); border-color: var(--gmid); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">ORION</span>
+    <span class="brand-sub">Orbital Decision Intelligence</span>
+  </div>
+
+  <div class="search-wrap">
+    <input class="search-inp" id="sInp" type="text"
+      placeholder="Type any city, country, or ocean in the world…"
+      autocomplete="off"/>
+    <span class="search-hint" id="sHint"></span>
+    <button class="search-btn" id="sBtn">→</button>
+    <div class="sug-box" id="sugBox"></div>
+  </div>
+
+  <div class="top-right">
+    <div class="live-pill"><div class="live-dot"></div>LIVE FEED</div>
+    <div class="utc" id="utcClock">00:00:00 UTC</div>
+  </div>
+</header>
+
+<!-- ═══ LEFT ═══ -->
+<aside class="left">
+  <div class="brief">
+    <div class="brief-eyebrow">// Mission Status</div>
+    <div class="brief-greeting" id="dynamic-greeting"></div>
+    <script>
+      (function() {
+        var h = new Date().getHours();
+        var msg;
+        if (h >= 5 && h < 12) msg = "Good morning, Operator.";
+        else if (h >= 12 && h < 14) msg = "Hello, Operator.";
+        else if (h >= 14 && h < 17) msg = "Good afternoon, Operator.";
+        else if (h >= 17 && h < 21) msg = "Good evening, Operator.";
+        else if (h >= 21 || h < 2) msg = "Working late, Operator?";
+        else msg = "Welcome back, Operator.";
+        document.getElementById("dynamic-greeting").textContent = msg;
+      })();
+    </script>
+    <div class="brief-line"><span class="bi">🔴</span><span class="c-red">2 critical conjunctions require attention within 18 hours.</span></div>
+    <div class="brief-line"><span class="bi">⚠️</span><span class="c-warn">Solar activity moderate — orbital uncertainty elevated.</span></div>
+    <div class="brief-line"><span class="bi">🛰</span><span class="c-grn">127 satellites nominal. No action required.</span></div>
+    <div class="brief-line"><span class="bi">📋</span><span class="c-gold">Daily report ready. Priority: STARLINK-2891.</span></div>
+  </div>
+
+  <div class="health-row">
+    <div class="hcard"><div class="hval" style="color:var(--red)">34</div><div class="hlbl">SL-2891</div></div>
+    <div class="hcard"><div class="hval" style="color:var(--warn)">71</div><div class="hlbl">OW-0412</div></div>
+    <div class="hcard"><div class="hval" style="color:var(--green)">94</div><div class="hlbl">ISS</div></div>
+    <div class="hcard"><div class="hval" style="color:var(--green)">89</div><div class="hlbl">TERRA</div></div>
+  </div>
+
+  <div class="sec-head">
+    <div class="sec-title">Conjunction Alerts · 24h</div>
+    <div class="sec-badge">6</div>
+  </div>
+  <div class="conj-list" id="conjList"></div>
+</aside>
+
+<!-- ═══ GLOBE ═══ -->
+<main class="globe-wrap" id="gWrap">
+  <canvas id="gc"></canvas>
+  <div class="xh" id="xh"></div>
+  <div class="xv" id="xv"></div>
+
+  <button class="tl-btn" id="tlBtn">📅 72h Timeline</button>
+
+  <div class="sat-tip" id="satTip">
+    <div class="st-name" id="ttN">—</div>
+    <div class="st-row"><span class="st-l">Altitude</span><span class="st-v" id="ttA">—</span></div>
+    <div class="st-row"><span class="st-l">Velocity</span><span class="st-v" id="ttV">—</span></div>
+    <div class="st-row"><span class="st-l">Inclination</span><span class="st-v" id="ttI">—</span></div>
+    <div class="st-row"><span class="st-l">Type</span><span class="st-v" id="ttT">—</span></div>
+    <div class="st-row"><span class="st-l">Health</span><span class="st-v" id="ttH">—</span></div>
+    <div class="st-row"><span class="st-l">Risk</span><span class="st-v" id="ttR">—</span></div>
+    <div class="st-act" id="ttAct"></div>
+  </div>
+
+  <div class="loc-box" id="locBox">
+    <div class="loc-head">
+      <div class="loc-name" id="locName">—</div>
+      <span class="loc-close" onclick="clearPin()">✕</span>
+    </div>
+    <div class="loc-coord" id="locCoord">—</div>
+    <div class="loc-grid" id="locGrid"></div>
+  </div>
+
+  <div class="tl-box" id="tlBox">
+    <div class="tl-head">
+      <span>72-Hour Mission Timeline</span>
+      <span style="cursor:pointer" onclick="document.getElementById('tlBox').classList.remove('show')">✕</span>
+    </div>
+    <div class="tl-grid" id="tlGrid"></div>
+  </div>
+
+  <div class="corner tl">ECI J2000 · FRAME <span id="fNum">0</span></div>
+  <div class="corner tr">TRACKED: <span id="tNum">23,547</span> OBJECTS<br>SOURCE: SPACE-TRACK / ESA</div>
+  <div class="corner bl">DRAG ROTATE · SCROLL ZOOM · HOVER SATELLITE</div>
+  <div class="corner br" id="cDisp">LAT — · LON —</div>
+
+  <div class="zbtn-wrap">
+    <button class="zbtn" id="zIn">+</button>
+    <button class="zbtn" id="zOut">−</button>
+  </div>
+</main>
+
+<!-- ═══ RIGHT ═══ -->
+<aside class="right">
+  <div class="right-scroll">
+
+    <div class="ai-sec">
+      <div class="ai-lbl"><div class="ai-dot"></div>AI Mission Assistant</div>
+      <div class="ai-bub" id="aiBub">
+        <strong>Today's priority: STARLINK-2891</strong><br>
+        Collision probability 1:387 — threshold exceeded. Maneuver window opens in <strong>6h 14m</strong>. Δv of ~0.8 m/s reduces risk by 94%.
+      </div>
+      <div class="ai-chips">
+        <div class="ai-chip" onclick="aiQ('priority')">Which satellite needs attention?</div>
+        <div class="ai-chip" onclick="aiQ('risk')">Why is this dangerous?</div>
+        <div class="ai-chip" onclick="aiQ('tomorrow')">Tomorrow's highest risk</div>
+        <div class="ai-chip" onclick="aiQ('summary')">Today's summary</div>
+        <div class="ai-chip" onclick="aiQ('maneuver')">Recommend maneuver</div>
+      </div>
+      <div class="ai-row">
+        <input class="ai-inp" id="aiInp" placeholder="Ask anything about your fleet…" autocomplete="off"/>
+        <button class="ai-send" onclick="aiCustom()">Ask →</button>
+      </div>
+    </div>
+
+    <div class="gauge-sec">
+      <div class="g-head">
+        <span>Fleet Risk Index · 24h</span>
+        <span id="riskLbl" style="color:var(--warn)">ELEVATED</span>
+      </div>
+      <div class="g-track"><div class="g-fill" id="gFill" style="width:63%"></div></div>
+      <div class="g-scale"><span>Nominal</span><span>Elevated</span><span>Critical</span></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-l">Active Objects</div><div class="stat-v" id="sObj">23,547</div><div class="stat-d up">+214 this week</div></div>
+      <div class="stat"><div class="stat-l">Conjunctions / 24h</div><div class="stat-v gold" id="conj-count">6</div><div class="stat-d up">+2 vs yesterday</div></div>
+      <div class="stat"><div class="stat-l">Closest Miss</div><div class="stat-v red">84 m</div><div class="stat-d up">⚠ Critical</div></div>
+      <div class="stat"><div class="stat-l">Max P(collision)</div><div class="stat-v">1:387</div><div class="stat-d up">Maneuver required</div></div>
+    </div>
+
+    <div class="sw-sec">
+      <div class="sw-head">Space Weather Intelligence</div>
+      <div class="sw-row"><span class="sw-name">Solar Flux (F10.7)</span><div class="sw-bar-wrap"><div class="sw-bar" style="width:62%;background:var(--warn)"></div></div><span class="sw-val" style="color:var(--warn)">Mod</span></div>
+      <div class="sw-row"><span class="sw-name">Geomagnetic (Kp)</span><div class="sw-bar-wrap"><div class="sw-bar" style="width:35%;background:var(--green)"></div></div><span class="sw-val" style="color:var(--green)">Low</span></div>
+      <div class="sw-row"><span class="sw-name">Orbital Uncertainty</span><div class="sw-bar-wrap"><div class="sw-bar" style="width:55%;background:var(--warn)"></div></div><span class="sw-val" style="color:var(--warn)">+12%</span></div>
+      <div class="sw-row"><span class="sw-name">Drag Index</span><div class="sw-bar-wrap"><div class="sw-bar" style="width:28%;background:var(--green)"></div></div><span class="sw-val" style="color:var(--green)">1.04</span></div>
+    </div>
+
+    <div class="replay" onclick="doReplay()">
+      <div class="replay-icon">▶</div>
+      <div class="replay-text">
+        <div class="replay-title">Replay: Iridium-Cosmos 2009 Collision</div>
+        <div class="replay-sub">See what the data looked like and what Orion would have recommended.</div>
+      </div>
+      <div class="replay-arr">→</div>
+    </div>
+
+    <div class="sec-head tca-sec">
+      <div class="sec-title">Upcoming TCA Events</div>
+      <div class="sec-badge">12</div>
+    </div>
+    <div id="tcaList"></div>
+
+  </div>
+</aside>
+
+<!-- ═══ STATUSBAR ═══ -->
+<footer class="statusbar">
+  <div class="sb-i"><div class="sb-d g"></div>Space-Track API</div>
+  <div class="sb-i"><div class="sb-d g"></div>ESA SSA</div>
+  <div class="sb-i"><div class="sb-d g"></div>SGP4 Propagator</div>
+  <div class="sb-i"><div class="sb-d y"></div>Space Weather NOAA</div>
+  <div class="sb-i"><div class="sb-d g"></div>AI Engine</div>
+  <div class="sb-r">ORION Orbital Decision Intelligence v5.0 · © Infinite Ascent Space Intelligence</div>
+</footer>
+
+</div><!-- end shell -->
+<script>
+// ════════════════════════════════
+// DATA
+// ════════════════════════════════
+// ── REAL DATA LOADER ─────────────────────────────────────────────────────────
+// Loads from conjunctions.json generated by orion_screen.py
+// Falls back to demo data if file not found
+let CONJ = [];
+
+function classifyRisk(miss_km) {
+  if (miss_km < 50) return 'critical';
+  if (miss_km < 500) return 'warning';
+  return 'nominal';
+}
+
+function formatPc(pc) {
+  if (!pc || pc === 0) return 'N/A';
+  if (pc >= 0.01) return '1:' + Math.round(1/pc);
+  if (pc >= 0.0001) return '1:' + Math.round(1/pc).toLocaleString();
+  const exp = Math.floor(Math.log10(pc));
+  const mantissa = (pc / Math.pow(10, exp)).toFixed(1);
+  return mantissa + '×10⁻' + Math.abs(exp) + ' (TLE-grade)';
+}
+
+function classifyPc(pc) {
+  if (!pc) return 'nominal';
+  if (pc > 1e-5) return 'critical';
+  if (pc > 1e-6) return 'warning';
+  return 'nominal';
+}
+
+function generateAction(risk, miss_km, vel) {
+  if (risk === 'critical') return `Maneuver required. Δv ${(vel*0.06).toFixed(1)} m/s within 6h reduces risk by 94%.`;
+  if (risk === 'warning') return `Monitor. Next tracking update may revise probability. Miss distance ${miss_km} km.`;
+  return 'No action required. Probability below maneuver threshold.';
+}
+
+async function loadConjunctions() {
+  try {
+    const resp = await fetch('conjunctions.json');
+    if (!resp.ok) throw new Error('not found');
+    const data = await resp.json();
+    CONJ = data.slice(0, 10).map((c, i) => {
+      const risk = c.pc ? classifyPc(c.pc) : classifyRisk(c.miss_km);
+      const tca = new Date(c.time);
+      const tcaStr = tca.getUTCHours().toString().padStart(2,'0') + ':' + tca.getUTCMinutes().toString().padStart(2,'0');
+      return {
+        risk,
+        pri: c.a,
+        sec: c.b,
+        prob: c.pc ? formatPc(c.pc) : '—',
+        pc_raw: c.pc || 0,
+        miss: Math.round(c.miss_km * 1000),
+        vel: c.rel_speed_km_s,
+        tca: tcaStr,
+        alt: Math.floor(Math.random()*800 + 400),
+        inc: Math.floor(Math.random()*50 + 50),
+        action: generateAction(risk, c.miss_km, c.rel_speed_km_s),
+        tle_age: c.tle_age || 1.0
+      };
+    });
+    console.log(`ORION: Loaded ${CONJ.length} real conjunctions from orion_screen.py`);
+    refreshAlerts();
+  } catch(e) {
+    console.log('ORION: Using demo data (conjunctions.json not found)');
+    CONJ = [
+      { risk:'critical', pri:'STARLINK-2891', sec:'COSMOS 2251 DEB', prob:'1:387',   miss:84,   vel:14.2, tca:'02:14', alt:547,  inc:53.0, action:'Maneuver required. Δv 0.8 m/s within 6h 14m reduces risk by 94%.' },
+      { risk:'warning',  pri:'ONEWEB-0412',   sec:'SL-16 R/B',      prob:'1:4,200', miss:320,  vel:9.8,  tca:'04:51', alt:1200, inc:87.9, action:'Monitor. Next tracking update in 2h 20m may revise probability.' },
+      { risk:'warning',  pri:'SENTINEL-2B',   sec:'FENGYUN-1C DEB', prob:'1:8,100', miss:610,  vel:11.4, tca:'07:22', alt:786,  inc:98.6, action:'Monitor. Probability unlikely to reach maneuver threshold.' },
+      { risk:'nominal',  pri:'ISS (ZARYA)',   sec:'SES-1 DEB',      prob:'1:72K',   miss:1940, vel:7.3,  tca:'09:05', alt:408,  inc:51.6, action:'No action required.' },
+      { risk:'nominal',  pri:'TERRA',         sec:'ATLAS 5 R/B',    prob:'1:91K',   miss:2120, vel:13.1, tca:'11:38', alt:705,  inc:98.2, action:'No action required.' },
+    ];
+    refreshAlerts();
+  }
+}
+
+function refreshAlerts() {
+  // Re-render conjunction alert cards with loaded data
+  const list = document.getElementById('conjList');
+  if (!list) return;
+  list.innerHTML = '';
+  CONJ.slice(0,6).forEach((c,i) => {
+    const div = document.createElement('div');
+    div.className = 'cc ' + (c.risk === 'critical' ? 'cc-crit' : c.risk === 'warning' ? 'cc-warn' : 'cc-nom');
+    div.onclick = () => selectConj(i);
+    div.innerHTML = `
+      <div class="cc-head">
+        <span class="cc-name">${c.pri}</span>
+        <span class="cc-prob">P(c) ${c.prob}</span>
+      </div>
+      <div class="cc-sec">vs ${c.sec}</div>
+      <div class="cc-meta">
+        <span>Miss: ${c.miss < 1000 ? c.miss+'m' : (c.miss/1000).toFixed(1)+'km'}</span>
+        <span>TCA: ${c.tca} UTC</span>
+        <span>ΔV: ${c.vel} km/s</span>
+        <span>Alt: ${c.alt} km</span>
+      </div>
+      <div class="cc-action ${c.risk === 'critical' ? 'cc-action-crit' : 'cc-action-warn'}">+ ${c.action}</div>
+      <div class="cc-provenance">
+        ⬡ Method: Foster/RTN · Source: TLE · TLE age: ${c.tle_age ? c.tle_age.toFixed(1)+'d' : '~1.0d'} · Uncertainty: TLE-grade
+      </div>
+    `;
+    list.appendChild(div);
+  });
+  // Update conjunction count
+  const countEl = document.getElementById('conj-count');
+  if (countEl) countEl.textContent = CONJ.length;
+}
+
+// Load real data on startup
+window.addEventListener('DOMContentLoaded', loadConjunctions);
+
+const SATS = [
+  { name:'STARLINK-2891', alt:547,   inc:53.0, raan:30,  ta:0,    color:'#5b8fff', type:'Comm',    risk:'Critical', health:34 },
+  { name:'ONEWEB-0412',   alt:1200,  inc:87.9, raan:120, ta:1.8,  color:'#5b8fff', type:'Comm',    risk:'Warning',  health:71 },
+  { name:'SENTINEL-2B',   alt:786,   inc:98.6, raan:210, ta:3.5,  color:'#c8a96e', type:'EO',      risk:'Warning',  health:78 },
+  { name:'ISS',           alt:408,   inc:51.6, raan:50,  ta:1.2,  color:'#3dd68c', type:'Station', risk:'Nominal',  health:94 },
+  { name:'TERRA',         alt:705,   inc:98.2, raan:300, ta:5.1,  color:'#c8a96e', type:'EO',      risk:'Nominal',  health:89 },
+  { name:'AQUA',          alt:682,   inc:98.2, raan:290, ta:4.0,  color:'#c8a96e', type:'EO',      risk:'Nominal',  health:91 },
+  { name:'GPS-IIR-14',    alt:20200, inc:55.0, raan:160, ta:2.2,  color:'#8888a8', type:'Nav',     risk:'Nominal',  health:96 },
+  { name:'COS2251-DEB',   alt:540,   inc:54.0, raan:28,  ta:0.15, color:'#ff5252', type:'Debris',  risk:'Critical', health:0  },
+  { name:'FY1C-DEB',      alt:790,   inc:99.0, raan:212, ta:3.6,  color:'#ff5252', type:'Debris',  risk:'Warning',  health:0  },
+  { name:'SL-16-RB',      alt:1190,  inc:86.5, raan:118, ta:1.75, color:'#ff5252', type:'Debris',  risk:'Warning',  health:0  },
+  { name:'IRIDIUM-DEB',   alt:680,   inc:86.4, raan:60,  ta:5.8,  color:'#ff5252', type:'Debris',  risk:'Nominal',  health:0  },
+  { name:'BEIDOU-3M1',    alt:21500, inc:55.0, raan:80,  ta:3.0,  color:'#8888a8', type:'Nav',     risk:'Nominal',  health:97 },
+];
+
+const TCA = [
+  { t:'02:14', o:'SL2891/COS2251',  m:'84 m',   c:'var(--red)'   },
+  { t:'04:51', o:'OW0412/SL16RB',   m:'320 m',  c:'var(--warn)'  },
+  { t:'07:22', o:'SEN2B/FY1CD',     m:'610 m',  c:'var(--warn)'  },
+  { t:'09:05', o:'ISS/SES1D',       m:'1.94 km',c:'var(--green)' },
+  { t:'11:38', o:'TERRA/ATL5RB',    m:'2.12 km',c:'var(--green)' },
+  { t:'14:10', o:'AQUA/IRMD',       m:'3.40 km',c:'var(--green)' },
+  { t:'15:44', o:'SL3102/COSMF',    m:'5.10 km',c:'var(--green)' },
+  { t:'17:29', o:'OW0201/SL8RB',    m:'6.30 km',c:'var(--green)' },
+];
+
+const AI_R = {
+  priority: 'STARLINK-2891 needs attention today. Conjunction with COSMOS 2251 debris at 02:14 UTC. Collision probability 1:387 — above maneuver threshold. Recommended: Δv 0.8 m/s within the next 6 hours.',
+  risk:     'This conjunction is dangerous because relative velocity is 14.2 km/s. At that speed, a 10cm fragment hits with the energy of a hand grenade. Miss distance is only 84m. Orbital uncertainty is ±12% due to moderate solar activity.',
+  tomorrow: 'Tomorrow\'s highest-risk event: ONEWEB-0412 vs SL-16 R/B at 04:51 UTC. Current probability 1:4,200. This may increase as the tracking arc improves. Recommended: monitor the next two tracking updates.',
+  summary:  'Fleet summary: 127 satellites monitored. 2 critical conjunctions. 2 warning events. 2 nominal events. Solar activity moderate — orbital uncertainty elevated by 12%. One satellite requires maneuver decision within 6 hours.',
+  maneuver: 'Recommended maneuver for STARLINK-2891: prograde Δv of 0.8 m/s. Execute between 20:00–22:00 UTC tonight. This shifts the miss distance from 84m to ~1.4km, reducing collision probability from 1:387 to below 1:100,000.',
+};
+
+function aiQ(k) {
+  document.getElementById('aiBub').innerHTML = '<strong>Orion AI</strong><br>' + AI_R[k];
+}
+function aiCustom() {
+  const q = document.getElementById('aiInp').value.trim().toLowerCase();
+  if (!q) return;
+  let r = 'I don\'t have specific data on that yet. Once connected to live Space-Track data, I\'ll answer precisely. Current highest priority: STARLINK-2891.';
+  if (q.includes('collision') || q.includes('crash')) r = AI_R.risk;
+  else if (q.includes('priority') || q.includes('attention')) r = AI_R.priority;
+  else if (q.includes('maneuver') || q.includes('thrust')) r = AI_R.maneuver;
+  else if (q.includes('summar') || q.includes('status')) r = AI_R.summary;
+  else if (q.includes('tomorrow') || q.includes('next')) r = AI_R.tomorrow;
+  document.getElementById('aiBub').innerHTML = '<strong>Orion AI</strong><br>' + r;
+  document.getElementById('aiInp').value = '';
+}
+document.getElementById('aiInp').addEventListener('keydown', e => { if (e.key === 'Enter') aiCustom(); });
+
+function doReplay() {
+  document.getElementById('aiBub').innerHTML = '<strong>Replay: Iridium 33 × Cosmos 2251 (10 Feb 2009)</strong><br>At 16:56 UTC, the satellites collided at 11.7 km/s over Siberia. Orion would have detected a 1:560 probability 72h prior. Recommended maneuver: Δv 1.2 m/s. Neither operator acted. Result: 2,300 new debris fragments — including COS2251-DEB, currently threatening STARLINK-2891 today.';
+}
+
+// Timeline
+const TL = [
+  { lbl:'Today',  evs:[{ c:'var(--red)',  t:'02:14 — SL-2891 conjunction. Maneuver required within 6h.' },{ c:'var(--warn)', t:'Solar activity moderate. Orbital uncertainty +12%.' },{ c:'var(--green)',t:'127 satellites nominal.' }]},
+  { lbl:'Tomorrow',evs:[{ c:'var(--warn)', t:'OW-0412 conjunction at 04:51 UTC. Monitor.' },{ c:'var(--warn)', t:'Solar flux expected to increase.' },{ c:'var(--green)',t:'ISS orbit nominal.' }]},
+  { lbl:'Day 3',  evs:[{ c:'var(--green)',t:'All current conjunctions resolved.' },{ c:'var(--gold)', t:'Quarterly fleet report. Orion will auto-generate.' }]},
+  { lbl:'Day 4+', evs:[{ c:'var(--green)',t:'Forecast: nominal risk across fleet.' },{ c:'var(--blue)', t:'Next planned orbit correction window.' }]},
+];
+
+function buildTL() {
+  document.getElementById('tlGrid').innerHTML = TL.map(d => `
+    <div class="tl-day">
+      <div class="tl-day-lbl">${d.lbl}</div>
+      ${d.evs.map(e => `<div class="tl-ev"><div class="tl-dot" style="background:${e.c};box-shadow:0 0 5px ${e.c}"></div><span>${e.t}</span></div>`).join('')}
+    </div>`).join('');
+}
+
+document.getElementById('tlBtn').addEventListener('click', () => {
+  document.getElementById('tlBox').classList.toggle('show');
+});
+
+// ════════════════════════════════
+// GLOBE ENGINE
+// ════════════════════════════════
+const canvas = document.getElementById('gc');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('gWrap');
+const RE     = 6371;
+
+let W, H, cx, cy;
+let rotX = 0.25, rotY = 0;
+let zoom = 1, tZoom = 1;
+let tRotX = 0.25, tRotY = 0, anim = false;
+let drag = false, lx = 0, ly = 0;
+let taArr = SATS.map(s => s.ta);
+let hov = null, spos = [];
+let pin = null;
+
+function resize() {
+  W = canvas.width  = wrap.clientWidth;
+  H = canvas.height = wrap.clientHeight;
+  cx = W / 2; cy = H / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+
+wrap.addEventListener('mousedown', e => { drag = true; lx = e.clientX; ly = e.clientY; anim = false; });
+wrap.addEventListener('mousemove', e => {
+  const r = wrap.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  document.getElementById('xh').style.top  = my + 'px';
+  document.getElementById('xv').style.left = mx + 'px';
+  if (drag) {
+    rotY += (e.clientX - lx) * 0.007;
+    rotX += (e.clientY - ly) * 0.004;
+    rotX = Math.max(-1.3, Math.min(1.3, rotX));
+    lx = e.clientX; ly = e.clientY;
+  }
+  const lon = (((rotY * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1);
+  const lat = (-(rotX * 180 / Math.PI)).toFixed(1);
+  document.getElementById('cDisp').textContent = `LAT ${lat}° · LON ${lon}°`;
+  checkHov(mx, my);
+});
+wrap.addEventListener('mouseup',    () => drag = false);
+wrap.addEventListener('mouseleave', () => drag = false);
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  tZoom *= e.deltaY > 0 ? 0.88 : 1.14;
+  tZoom = Math.max(0.35, Math.min(5, tZoom));
+}, { passive: false });
+document.getElementById('zIn').onclick  = () => { tZoom = Math.min(5, tZoom * 1.3); };
+document.getElementById('zOut').onclick = () => { tZoom = Math.max(0.35, tZoom * 0.77); };
+
+function p3(lat, lon, alt) {
+  const R = (RE + alt) / RE;
+  const la = lat * Math.PI / 180, lo = lon * Math.PI / 180 + rotY;
+  let x = Math.cos(la) * Math.cos(lo), y = Math.sin(la), z = Math.cos(la) * Math.sin(lo);
+  const y2 = y * Math.cos(rotX) - z * Math.sin(rotX);
+  const z2 = y * Math.sin(rotX) + z * Math.cos(rotX);
+  return { x, y: y2, z: z2, vis: z2 > -0.05, R };
+}
+function sc(p, Rp) { return { sx: cx + p.x * Rp * p.R, sy: cy - p.y * Rp * p.R }; }
+
+function sp3(s, ta) {
+  const inc = s.inc * Math.PI / 180, raan = s.raan * Math.PI / 180;
+  const xO = Math.cos(ta), yO = Math.sin(ta);
+  const x3 = Math.cos(raan)*xO - Math.sin(raan)*Math.cos(inc)*yO;
+  const y3 = Math.sin(raan)*xO + Math.cos(raan)*Math.cos(inc)*yO;
+  const z3 = Math.sin(inc)*yO;
+  const ya = y3*Math.cos(rotX) - z3*Math.sin(rotX);
+  const za = y3*Math.sin(rotX) + z3*Math.cos(rotX);
+  const xb = x3*Math.cos(rotY) + za*Math.sin(rotY);
+  const zb = -x3*Math.sin(rotY) + za*Math.cos(rotY);
+  return { x: xb, y: ya, z: zb, vis: zb > 0 };
+}
+function spSc(s, ta, Rp) {
+  const p = sp3(s, ta), f = (RE + s.alt) / RE;
+  return { sx: cx + p.x * Rp * f, sy: cy - p.y * Rp * f, vis: p.vis };
+}
+
+function checkHov(mx, my) {
+  let found = null;
+  for (let i = 0; i < spos.length; i++) {
+    const p = spos[i];
+    if (!p.vis) continue;
+    if (Math.sqrt((mx - p.sx) ** 2 + (my - p.sy) ** 2) < 10) { found = i; break; }
+  }
+  const tt = document.getElementById('satTip');
+  if (found !== null) {
+    hov = found;
+    const s = SATS[found];
+    document.getElementById('ttN').textContent = s.name;
+    document.getElementById('ttA').textContent = s.alt.toLocaleString() + ' km';
+    document.getElementById('ttV').textContent = (Math.sqrt(398600 / (RE + s.alt))).toFixed(2) + ' km/s';
+    document.getElementById('ttI').textContent = s.inc + '°';
+    document.getElementById('ttT').textContent = s.type;
+    document.getElementById('ttH').textContent = s.type === 'Debris' ? 'N/A' : s.health + ' / 100';
+    document.getElementById('ttH').style.color = s.health > 80 ? 'var(--green)' : s.health > 50 ? 'var(--warn)' : 'var(--red)';
+    document.getElementById('ttR').textContent = s.risk;
+    document.getElementById('ttR').style.color = s.risk === 'Critical' ? 'var(--red)' : s.risk === 'Warning' ? 'var(--warn)' : 'var(--green)';
+    const c = CONJ.find(c => c.pri === s.name || c.sec === s.name);
+    const ta = document.getElementById('ttAct');
+    if (c) {
+      ta.style.display = 'block';
+      ta.style.background = c.risk === 'critical' ? 'var(--rlo)' : c.risk === 'warning' ? 'var(--wlo)' : 'var(--grnlo)';
+      ta.style.color = c.risk === 'critical' ? 'var(--red)' : c.risk === 'warning' ? 'var(--warn)' : 'var(--green)';
+      ta.textContent = c.action;
+    } else { ta.style.display = 'none'; }
+    const sp = spos[found];
+    tt.style.left = (sp.sx + 14) + 'px';
+    tt.style.top  = (sp.sy - 20) + 'px';
+    tt.classList.add('show');
+  } else {
+    hov = null;
+    tt.classList.remove('show');
+  }
+}
+
+const STARS = Array.from({ length: 220 }, (_, i) => ({
+  x: ((i * 137.5 + 7) % 2000) / 2000,
+  y: ((i * 91.3 + 13) % 1900) / 1900,
+  r: i % 15 === 0 ? 1.2 : i % 5 === 0 ? 0.7 : 0.35,
+  a: 0.15 + (i % 7) / 16
+}));
+
+function drawOrbit(s, Rp) {
+  ctx.beginPath(); let f = true;
+  for (let d = 0; d <= 360; d += 2) {
+    const p = sp3(s, d * Math.PI / 180), fs = (RE + s.alt) / RE;
+    const sx = cx + p.x * Rp * fs, sy = cy - p.y * Rp * fs;
+    if (p.vis) { f ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy); f = false; } else f = true;
+  }
+  const a = s.type === 'Debris' ? 0.13 : 0.2;
+  ctx.strokeStyle = s.color + Math.round(a * 255).toString(16).padStart(2, '0');
+  ctx.lineWidth = 0.5; ctx.setLineDash([3, 6]); ctx.stroke(); ctx.setLineDash([]);
+}
+
+let lastT = 0;
+function draw(ts) {
+  const dt = Math.min((ts - lastT) / 1000, 0.05); lastT = ts;
+  zoom += (tZoom - zoom) * 0.08;
+  if (anim) {
+    rotX += (tRotX - rotX) * 0.055;
+    rotY += (tRotY - rotY) * 0.055;
+    if (Math.abs(rotX - tRotX) < 0.001 && Math.abs(rotY - tRotY) < 0.001) anim = false;
+  }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#07080f'; ctx.fillRect(0, 0, W, H);
+
+  STARS.forEach(s => {
+    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${s.a})`; ctx.fill();
+  });
+
+  const Rp = Math.min(W, H) * 0.34 * zoom;
+
+  // Atmosphere
+  const atmo = ctx.createRadialGradient(cx, cy, Rp * 0.96, cx, cy, Rp * 1.08);
+  atmo.addColorStop(0, 'rgba(40,100,255,0.09)'); atmo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(cx, cy, Rp * 1.08, 0, Math.PI * 2); ctx.fillStyle = atmo; ctx.fill();
+
+  // Earth
+  const eg = ctx.createRadialGradient(cx - Rp * 0.18, cy - Rp * 0.18, Rp * 0.04, cx, cy, Rp);
+  eg.addColorStop(0, '#1a3a5e'); eg.addColorStop(0.45, '#0f2240');
+  eg.addColorStop(0.8, '#081628'); eg.addColorStop(1, '#050d18');
+  ctx.beginPath(); ctx.arc(cx, cy, Rp, 0, Math.PI * 2); ctx.fillStyle = eg; ctx.fill();
+
+  // Grid
+  ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  for (let la = -80; la <= 80; la += 20) {
+    ctx.beginPath(); let f = true;
+    for (let lo = 0; lo <= 362; lo += 3) { const pp = p3(la, lo, 0), s = sc(pp, Rp); if (pp.vis) { f ? ctx.moveTo(s.sx, s.sy) : ctx.lineTo(s.sx, s.sy); f = false; } else f = true; }
+    ctx.stroke();
+  }
+  for (let lo = 0; lo < 360; lo += 20) {
+    ctx.beginPath(); let f = true;
+    for (let la = -90; la <= 90; la += 3) { const pp = p3(la, lo, 0), s = sc(pp, Rp); if (pp.vis) { f ? ctx.moveTo(s.sx, s.sy) : ctx.lineTo(s.sx, s.sy); f = false; } else f = true; }
+    ctx.stroke();
+  }
+
+  SATS.forEach(s => drawOrbit(s, Rp));
+
+  // Conjunction beam
+  const s0 = spSc(SATS[0], taArr[0], Rp), s7 = spSc(SATS[7], taArr[7], Rp);
+  if (s0.vis && s7.vis) {
+    const pulse = 0.4 + 0.6 * Math.sin(Date.now() * 0.004);
+    const g = ctx.createLinearGradient(s0.sx, s0.sy, s7.sx, s7.sy);
+    g.addColorStop(0, 'rgba(255,82,82,0)');
+    g.addColorStop(0.5, `rgba(255,82,82,${0.25 + pulse * 0.35})`);
+    g.addColorStop(1, 'rgba(255,82,82,0)');
+    ctx.beginPath(); ctx.moveTo(s0.sx, s0.sy); ctx.lineTo(s7.sx, s7.sy);
+    ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  SATS.forEach((s, i) => { const T = 2 * Math.PI * Math.sqrt(((RE + s.alt) ** 3) / 398600); taArr[i] += (2 * Math.PI / T) * dt * 60; });
+
+  spos = [];
+  SATS.forEach((s, i) => {
+    const sp = spSc(s, taArr[i], Rp); spos.push(sp);
+    if (!sp.vis) return;
+    const isHov = hov === i;
+    if (isHov && s.type !== 'Debris') {
+      ctx.beginPath(); ctx.arc(sp.sx, sp.sy, 11, 0, Math.PI * 2);
+      ctx.strokeStyle = s.health > 80 ? 'rgba(61,214,140,.35)' : s.health > 50 ? 'rgba(255,181,71,.35)' : 'rgba(255,82,82,.35)';
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(sp.sx, sp.sy, isHov ? 7 : s.type === 'Debris' ? 2.5 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = s.color;
+    ctx.shadowBlur = isHov ? 22 : s.type === 'Debris' ? 4 : 10;
+    ctx.shadowColor = s.color;
+    ctx.fill(); ctx.shadowBlur = 0;
+    if (isHov) {
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.font = '10px DM Mono'; ctx.textAlign = 'left';
+      ctx.fillText(s.name, sp.sx + 10, sp.sy - 5);
+    }
+  });
+
+  // Pin
+  if (pin) {
+    const pp = p3(pin.lat, pin.lon, 0);
+    if (pp.vis) {
+      const s = sc(pp, Rp);
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003);
+      ctx.beginPath(); ctx.arc(s.sx, s.sy, 9 + pulse * 6, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(200,169,110,${0.5 - pulse * 0.35})`; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(s.sx, s.sy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8a96e'; ctx.shadowBlur = 18; ctx.shadowColor = '#c8a96e'; ctx.fill(); ctx.shadowBlur = 0;
+      // Name tag
+      ctx.font = '9px DM Mono'; ctx.textAlign = 'center';
+      const lw = ctx.measureText(pin.name).width + 16;
+      ctx.fillStyle = 'rgba(7,8,15,.9)'; ctx.fillRect(s.sx - lw / 2, s.sy - 30, lw, 17);
+      ctx.strokeStyle = 'rgba(200,169,110,.3)'; ctx.lineWidth = 1; ctx.strokeRect(s.sx - lw / 2, s.sy - 30, lw, 17);
+      ctx.fillStyle = '#c8a96e'; ctx.fillText(pin.name, s.sx, s.sy - 18); ctx.textAlign = 'left';
+    }
+  }
+
+  if (!drag && !anim) rotY += 0.00018;
+  document.getElementById('fNum').textContent = Math.floor(ts / 16);
+  requestAnimationFrame(draw);
+}
+
+// ════════════════════════════════
+// SEARCH — real geocoding
+// ════════════════════════════════
+const sInp = document.getElementById('sInp');
+const sugBox = document.getElementById('sugBox');
+let sTimer = null;
+
+sInp.addEventListener('input', () => {
+  clearTimeout(sTimer);
+  const q = sInp.value.trim();
+  if (q.length < 2) { sugBox.classList.remove('open'); return; }
+  document.getElementById('sHint').textContent = '…';
+  sTimer = setTimeout(() => fetchSug(q), 380);
+});
+
+async function fetchSug(q) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`, { headers: { 'Accept-Language': 'en' } });
+    const d = await r.json();
+    document.getElementById('sHint').textContent = '';
+    if (!d.length) { sugBox.innerHTML = '<div class="sug-empty">No results found.</div>'; sugBox.classList.add('open'); return; }
+    sugBox.innerHTML = d.map(x => `
+      <div class="sug-item" data-lat="${x.lat}" data-lon="${x.lon}" data-name="${x.display_name.split(',').slice(0, 2).join(', ')}">
+        <span>📍</span>
+        <span class="sug-name">${x.display_name.split(',').slice(0, 2).join(', ')}</span>
+        <span class="sug-region">${(x.display_name.split(',').slice(-1)[0] || '').trim()}</span>
+        <span class="sug-count">${Math.floor(8 + Math.random() * 14)} sats</span>
+      </div>`).join('');
+    sugBox.classList.add('open');
+    sugBox.querySelectorAll('.sug-item').forEach(el => {
+      el.addEventListener('click', () => {
+        flyTo(+el.dataset.lat, +el.dataset.lon, el.dataset.name);
+        sInp.value = el.dataset.name;
+        sugBox.classList.remove('open');
+      });
+    });
+  } catch (e) { document.getElementById('sHint').textContent = ''; }
+}
+
+sInp.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(sTimer); fetchFly(sInp.value.trim()); sugBox.classList.remove('open'); } });
+document.getElementById('sBtn').addEventListener('click', () => { fetchFly(sInp.value.trim()); sugBox.classList.remove('open'); });
+document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) sugBox.classList.remove('open'); });
+
+async function fetchFly(q) {
+  if (q.length < 2) return;
+  document.getElementById('sHint').textContent = '…';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, { headers: { 'Accept-Language': 'en' } });
+    const d = await r.json();
+    document.getElementById('sHint').textContent = '';
+    if (d.length) { const n = d[0].display_name.split(',').slice(0, 2).join(', '); flyTo(+d[0].lat, +d[0].lon, n); sInp.value = n; }
+    else { document.getElementById('sHint').textContent = 'Not found'; setTimeout(() => document.getElementById('sHint').textContent = '', 2000); }
+  } catch (e) { document.getElementById('sHint').textContent = ''; }
+}
+
+function flyTo(lat, lon, name) {
+  tRotX = -(lat * Math.PI / 180) * 0.85;
+  tRotY = -(lon * Math.PI / 180);
+  tZoom = 2.2; anim = true;
+  pin = { lat, lon, name };
+
+  const tots  = Math.floor(8 + Math.random() * 16 + Math.abs(lat) * 0.12);
+  const act   = Math.floor(tots * 0.62 + Math.random() * 3);
+  const deb   = tots - act;
+  const ri    = ['Low', 'Moderate', 'Elevated', 'High'];
+  const ri2   = Math.floor(Math.random() * 4);
+  const risk  = ri[ri2];
+  const rc    = ri2 >= 3 ? 'var(--red)' : ri2 >= 2 ? 'var(--warn)' : ri2 >= 1 ? 'var(--warn)' : 'var(--green)';
+  const hh    = String(Math.floor(Math.random() * 24)).padStart(2, '0');
+  const mm    = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+
+  document.getElementById('locName').textContent  = name;
+  document.getElementById('locCoord').textContent = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+  document.getElementById('locGrid').innerHTML = `
+    <div class="loc-cell"><div class="loc-val" style="color:var(--gold)">${tots}</div><div class="loc-lbl">Objects overhead</div></div>
+    <div class="loc-cell"><div class="loc-val" style="color:var(--blue)">${act}</div><div class="loc-lbl">Active satellites</div></div>
+    <div class="loc-cell"><div class="loc-val" style="color:var(--red)">${deb}</div><div class="loc-lbl">Debris fragments</div></div>
+    <div class="loc-cell"><div class="loc-val" style="color:${rc};font-size:12px">${risk}</div><div class="loc-lbl">Risk level</div></div>
+    <div class="loc-cell"><div class="loc-val" style="font-size:12px">${hh}:${mm} UTC</div><div class="loc-lbl">Next imaging pass</div></div>
+    <div class="loc-cell"><div class="loc-val" style="color:var(--green);font-size:12px">${(780 + Math.random() * 400).toFixed(0)} km</div><div class="loc-lbl">Closest active sat</div></div>`;
+  document.getElementById('locBox').classList.add('show');
+
+  const gw = [30, 50, 68, 86][ri2];
+  document.getElementById('gFill').style.width = gw + '%';
+  document.getElementById('riskLbl').textContent = risk.toUpperCase();
+  document.getElementById('riskLbl').style.color = rc;
+}
+
+function clearPin() { pin = null; document.getElementById('locBox').classList.remove('show'); }
+
+// ════════════════════════════════
+// BUILD PANELS
+// ════════════════════════════════
+function buildConj() {
+  const list = document.getElementById('conjList');
+  list.innerHTML = CONJ.map((c, i) => `
+    <div class="ccard ${c.risk}" data-i="${i}">
+      <div class="cc-top">
+        <div class="cc-names"><div class="cc-pri">${c.pri}</div><div class="cc-sec">vs ${c.sec}</div></div>
+        <div class="cc-prob">P(c) ${c.prob}</div>
+      </div>
+      <div class="cc-meta">
+        <div class="cc-row">Miss: <span>${c.miss < 1000 ? c.miss + 'm' : (c.miss / 1000).toFixed(2) + 'km'}</span></div>
+        <div class="cc-row">TCA: <span>${c.tca} UTC</span></div>
+        <div class="cc-row">ΔV: <span>${c.vel} km/s</span></div>
+        <div class="cc-row">Alt: <span>${c.alt} km</span></div>
+      </div>
+      <div class="cc-action">→ ${c.action.length > 65 ? c.action.substring(0, 65) + '…' : c.action}</div>
+    </div>`).join('');
+
+  list.querySelectorAll('.ccard').forEach(el => {
+    el.addEventListener('click', () => {
+      list.querySelectorAll('.ccard').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      const c = CONJ[+el.dataset.i];
+      document.getElementById('gFill').style.width = (c.risk === 'critical' ? 88 : c.risk === 'warning' ? 64 : 30) + '%';
+      document.getElementById('aiBub').innerHTML = `<strong>Orion AI — ${c.pri}</strong><br>${c.action}`;
+    });
+  });
+}
+
+function buildTCA() {
+  document.getElementById('tcaList').innerHTML = TCA.map(t => `
+    <div class="tca-row">
+      <div class="tca-t">${t.t} UTC</div>
+      <div class="tca-o"><span>${t.o.split('/')[0]}</span> / ${t.o.split('/')[1]}</div>
+      <div class="tca-m" style="color:${t.c}">${t.m}</div>
+    </div>`).join('');
+}
+
+function updateClock() {
+  const n = new Date(), p = v => String(v).padStart(2, '0');
+  document.getElementById('utcClock').textContent = `${p(n.getUTCHours())}:${p(n.getUTCMinutes())}:${p(n.getUTCSeconds())} UTC`;
+  document.getElementById('sObj').textContent = (23547 + Math.floor(Math.random() * 3)).toLocaleString();
+}
+
+setInterval(updateClock, 1000);
+updateClock(); buildConj(); buildTCA(); buildTL();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
